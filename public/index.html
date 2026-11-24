@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10131b">
+<title>KickTranscriber — 直播转录</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0e14;--panel:#141a24;--line:#283244;--muted:#9aa8bb;--accent:#53e0a1}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#182335 0,#0b0e14 55%);color:#eef4fc;font:16px/1.55 system-ui,-apple-system,sans-serif;min-height:100vh}
+main{width:min(900px,92%);margin:56px auto}.brand{font-size:13px;letter-spacing:.18em;color:var(--accent);font-weight:800}.hero{margin:18px 0 30px}.hero h1{font-size:clamp(32px,7vw,52px);line-height:1.08;margin:0 0 14px}.hero p{color:var(--muted);max-width:650px;margin:0}
+.panel{background:#141a24eF;border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:0 20px 70px #0005}.tabs{display:flex;gap:8px;margin-bottom:20px}.tab{background:#202a39;color:#cbd5e1;border:1px solid var(--line);padding:10px 14px;border-radius:10px;cursor:pointer}.tab.active{background:#173b31;color:#8ff0c1;border-color:#287b5b}
+label{display:block;font-weight:650;margin:12px 0 8px}input,select{width:100%;background:#0d121b;border:1px solid #354257;border-radius:10px;padding:13px;color:#fff;font:inherit}input[type=file]{padding:10px}
+button.primary{margin-top:18px;width:100%;padding:14px;border:0;border-radius:11px;background:var(--accent);color:#062317;font-weight:800;font-size:16px;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.hint,.status{color:var(--muted);font-size:13px}.status{margin-top:14px;min-height:24px}.result{margin-top:22px;display:none}.result h2{font-size:18px}.result pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1018;border:1px solid var(--line);padding:16px;border-radius:12px;max-height:420px;overflow:auto}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions button{background:#263347;color:white;border:1px solid #40516b;border-radius:9px;padding:9px 13px;cursor:pointer}.hidden{display:none}footer{color:#718096;font-size:12px;margin:22px 4px}
+</style>
+</head>
+<body><main>
+<div class="brand">KICKTRANSCRIBER</div>
+<section class="hero"><h1>把直播语音，变成文字。</h1><p>上传直播音频，生成带时间戳的原文、中文翻译和内容摘要。无需 ChatGPT 插件或 MCP。</p></section>
+<section class="panel">
+<div class="tabs"><button class="tab active" id="uploadTab">上传音频</button><button class="tab" id="linkTab" disabled title="Kick 链接提取功能正在开发">Kick 回放链接（开发中）</button></div>
+<form id="form">
+<label for="audio">选择音频文件</label><input id="audio" type="file" accept="audio/*,video/mp4,video/webm" required>
+<p class="hint">支持常见音频格式；当前单文件上限 24 MB。Kick 回放链接直连提取尚未启用。</p>
+<label for="language">原始语言（可选）</label><input id="language" placeholder="例如 en；留空自动识别">
+<label for="target">翻译语言</label><select id="target"><option value="zh" selected>简体中文</option><option value="en">English</option><option value="ja">日本語</option><option value="ko">한국어</option></select>
+<button class="primary" id="submit" type="submit">开始转录</button><div class="status" id="status" role="status"></div>
+</form>
+<div class="result" id="result">
+<h2>转录结果</h2><div class="actions"><button id="copyAll">复制全部</button><button id="download">下载 TXT</button></div>
+<h3>原文</h3><pre id="transcript"></pre><h3>中文翻译</h3><pre id="translation"></pre><h3>摘要</h3><pre id="summary"></pre><h3>时间戳</h3><pre id="segments"></pre>
+</div></section>
+<footer>音频会发送到网站配置的语音识别服务进行处理。请仅上传你有权处理的内容。</footer>
+</main>
+<script>
+const form=document.querySelector('#form'),statusEl=document.querySelector('#status'),submit=document.querySelector('#submit');
+let output='';
+form.addEventListener('submit',async e=>{
+ e.preventDefault();const file=document.querySelector('#audio').files[0];if(!file)return;
+ if(file.size>24*1024*1024){statusEl.textContent='文件超过 24 MB，请先压缩或分段。';return;}
+ submit.disabled=true;statusEl.textContent='正在上传并转录，请稍候…';document.querySelector('#result').style.display='none';
+ const data=new FormData();data.append('file',file);data.append('language',document.querySelector('#language').value);data.append('translate_to',document.querySelector('#target').value);
+ try{const response=await fetch('/transcribe',{method:'POST',body:data});const body=await response.json();if(!response.ok)throw new Error(body.error||body.details||'转录失败');
+ document.querySelector('#transcript').textContent=body.transcript||'';document.querySelector('#translation').textContent=body.translation||'暂无翻译';document.querySelector('#summary').textContent=body.summary||'暂无摘要';
+ document.querySelector('#segments').textContent=(body.segments||[]).map(s=>'['+s.start+' - '+s.end+'] '+s.text).join('\n');
+ output='原文\n'+(body.transcript||'')+'\n\n中文翻译\n'+(body.translation||'')+'\n\n摘要\n'+(body.summary||'')+'\n\n时间戳\n'+document.querySelector('#segments').textContent;
+ document.querySelector('#result').style.display='block';statusEl.textContent='转录完成。';
+ }catch(err){statusEl.textContent='处理失败：'+err.message;}finally{submit.disabled=false;}
+});
+document.querySelector('#copyAll').onclick=async()=>{await navigator.clipboard.writeText(output);statusEl.textContent='已复制结果。'};
+document.querySelector('#download').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([output],{type:'text/plain;charset=utf-8'}));a.download='kick-transcript.txt';a.click();URL.revokeObjectURL(a.href);};
+</script></body></html>
