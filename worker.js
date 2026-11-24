@@ -180,11 +180,15 @@ export default {
       });
     }
 
-    if (url.pathname === "/" && request.method === "GET") {
+    if (url.pathname === "/" && request.method === "GET" && env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
+
+    if (url.pathname === "/api" && request.method === "GET") {
       return json({
-        name: "Kick ChatGPT Transcriber",
+        name: "KickTranscriber",
         status: "ok",
-        endpoints: { health: "GET /health", transcribe: "POST /transcribe", mcp: "POST /mcp" }
+        endpoints: { health: "GET /health", transcribe: "POST /transcribe" }
       }, 200, origin);
     }
 
