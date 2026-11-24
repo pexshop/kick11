@@ -1,0 +1,11 @@
+{
+  "name": "kick-chatgpt-transcriber",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
